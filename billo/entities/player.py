@@ -1,11 +1,20 @@
 import math
+import random
 
 import pygame
 
 from billo.settings import WIDTH, HEIGHT, BLUE, WHITE, GRAY, RED, GREEN
+
 from billo.systems.fonts import font_large, font_mid, font_small
 
+from billo.systems.sounds import create_sound_map
+
+from billo.entities.bullets import Bullet
+from billo.weapons.smg import SMGBullet
+
 class Player:
+    BASE_COOLDOWN = 15   # Default-Pistole Basis-Cooldown (Frames)
+
     def __init__(self):
         self.x = WIDTH // 2
         self.y = HEIGHT // 2
@@ -21,7 +30,13 @@ class Player:
         self.powerup_level    = 0     # Anzahl eingesammelter PowerUps
         self.has_laser        = False  # Laserwaffe aktiv?
         self.laser_active     = False  # Wird Laser gerade abgefeuert?
-        self.laser_damage_timer = 0    # Zählt hoch bis 30 (= 0.5s @ 60fps)
+        self.laser_damage_timer = 0    # Zählt hoch bis TICK_FRAMES
+        self.laser_tick_mult  = 1.0   # Schadenstakt-Multiplikator (BulletTime)
+        # --- SMG ---
+        self.has_smg          = False  # SMG aktiv?
+        # --- Schaden ---
+        self.damage_mult      = 1.0   # Multiplikator für Waffenschaden (stapelbar)
+        self.damage_level     = 0     # Anzahl eingesammelter DamageUp-Items
         # --- Schild ---
         self.has_shield       = False  # Schutzschild aktiv?
         self.shield_pulse     = 0.0   # Puls-Animation-Phase
@@ -33,6 +48,8 @@ class Player:
         self.dash_speed       = 18    # Pixel pro Frame während Dash
         self.dash_duration    = 14    # Frames Dash-Dauer (~0.23 s)
         self.ghost_trail      = []    # [(x, y, alpha)] für Nachzieh-Effekt
+
+        self.sounds = create_sound_map()
 
     def update(self, keys):
         # --- Ghost-Trail altern ---
@@ -124,7 +141,7 @@ class Player:
         gun_len = 22
         ex = self.x + math.cos(self.angle) * gun_len
         ey = self.y + math.sin(self.angle) * gun_len
-        barrel_color = (255, 60, 60) if self.has_laser else GRAY
+        barrel_color = (255, 60, 60) if self.has_laser else (255, 160, 30) if self.has_smg else GRAY
         pygame.draw.line(surface, barrel_color, (int(self.x), int(self.y)), (int(ex), int(ey)), 5)
 
         # Schimmernder Schutzschild-Ring
@@ -173,26 +190,52 @@ class Player:
             laser_surf = font_small.render("🔴 LASER aktiv", True, (255, 80, 80))
             surface.blit(laser_surf, (bx, by - 46))
 
+        # SMG-Indikator
+        if self.has_smg:
+            smg_surf = font_small.render("🟠 SMG aktiv", True, (255, 160, 30))
+            surface.blit(smg_surf, (bx, by - 46))
+
         # Schild-Indikator
         if self.has_shield:
             shield_surf = font_small.render("🛡 SCHILD aktiv", True, (140, 180, 255))
             surface.blit(shield_surf, (bx, by - 68))
 
+        # DamageUp-Indikator
+        if self.damage_level > 0:
+            dmg_surf = font_small.render(f"💥 DMG +{self.damage_level * 2}%", True, (255, 100, 100))
+            surface.blit(dmg_surf, (bx, by - 90))
+
     def shoot(self):
         if self.shoot_cooldown == 0:
-            # Basis-Cooldown 15 Frames, pro PowerUp 2% schneller
-            self.shoot_cooldown = max(1, int(15 / self.shoot_speed_mult))
-            random.choice(PEW_SOUNDS).play()
-            return Bullet(self.x, self.y, self.angle)
+            if self.has_smg:
+                # SMG: 50 % kürzerer Cooldown, SMGBullet (50 % weniger Schaden)
+                self.shoot_cooldown = max(1, int(self.BASE_COOLDOWN * 0.5 / self.shoot_speed_mult))
+                random.choice(self.sounds["pews"]).play()
+                return SMGBullet(self.x, self.y, self.angle)
+            else:
+                # Default-Pistole
+                self.shoot_cooldown = max(1, int(self.BASE_COOLDOWN / self.shoot_speed_mult))
+                random.choice(self.sounds["pews"]).play()
+                return Bullet(self.x, self.y, self.angle)
         return None
 
     def collect_powerup(self):
         self.powerup_level    += 1
-        self.shoot_speed_mult *= 1.02   # +2 % pro PowerUp
+        self.shoot_speed_mult *= 1.02   # +2 % Schussrate für Bullet-Waffen
+        self.laser_tick_mult  *= 1.02   # +2 % Tick-Rate für Laser
 
     def collect_laser_powerup(self):
         self.has_laser = True
+        self.has_smg   = False   # Laser ersetzt die SMG
+
+    def collect_smg_pickup(self):
+        self.has_smg   = True
+        self.has_laser = False   # SMG ersetzt den Laser
 
     def collect_shield_powerup(self):
         self.has_shield   = True
         self.shield_pulse = 0.0
+
+    def collect_damageup(self):
+        self.damage_level += 1
+        self.damage_mult  *= 1.02   # +2 % pro Stack

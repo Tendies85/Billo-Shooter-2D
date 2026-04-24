@@ -1,7 +1,11 @@
 import random
+import math
+
 import pygame
 
-class PowerUp:
+from billo.settings import WIDTH, HEIGHT
+
+class BulletTime:
     """Patronen-förmiges PowerUp – erhöht Schussrate um 2 % pro Einsammlung."""
     COLLECT_RADIUS = 18
 

@@ -1,6 +1,7 @@
 import math
 import pygame
 
+from billo.settings import WIDTH, HEIGHT, YELLOW
 
 class Bullet:
     def __init__(self, x, y, angle):
