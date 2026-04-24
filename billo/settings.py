@@ -1,4 +1,4 @@
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = 1920, 1080
 
 BLACK      = (0, 0, 0)
 WHITE      = (255, 255, 255)

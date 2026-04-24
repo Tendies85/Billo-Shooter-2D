@@ -2,6 +2,8 @@ import random
 import math
 import pygame
 
+from billo.settings import WIDTH, HEIGHT, WHITE
+
 class ShieldPowerUp:
     """Schild-förmiges PowerUp – gewährt einmaligen Schadensschutz."""
     COLLECT_RADIUS = 20
