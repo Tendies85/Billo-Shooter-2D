@@ -35,12 +35,18 @@ class Renderer:
             lpu.draw(surface)
         for spu in game.smg_pickups:
             spu.draw(surface)
+        for sgpu in game.shotgun_pickups:
+            sgpu.draw(surface)
         for spu in game.shield_powerups:
             spu.draw(surface)
         for du in game.damageups:
             du.draw(surface)
+        for gb in game.getsbiggers:
+            gb.draw(surface)
         for t in game.trinkets:
             t.draw(surface)
+        for orb in game.xporbs:
+            orb.draw(surface)
         for z in game.zombies:
             z.draw(surface)
         for b in game.bullets:
@@ -48,9 +54,12 @@ class Renderer:
 
         if game.player.laser_active:
             laser = Laser(game.player.x, game.player.y, game.player.angle)
-            laser.draw(surface, game.frame)
+            laser.draw(surface, game.frame, game.player.size_mult)
 
         game.player.draw(surface)
+        # Orbital-Satelliten
+        for sat in getattr(game.player, "satellites", []):
+            sat.draw(surface, game.player.x, game.player.y)
         game.player.draw_hud(surface)
 
         # ── Score & Welle ──
@@ -59,11 +68,19 @@ class Renderer:
         surface.blit(score_surf, (20, 16))
         surface.blit(wave_surf,  (20, 44))
 
+        # ── XP oben rechts ──
+        xp_surf = font_mid.render(f"XP: {game.player.xp}", True, (120, 255, 180))
+        surface.blit(xp_surf, (WIDTH - xp_surf.get_width() - 20, 16))
+
         # ── Wellen-Timer / Zwischen-Wellen-Banner ──
         if game.between_waves:
             _draw_between_banner(surface, game)
         else:
             _draw_wave_timer(surface, game)
+
+        # ── Pause-Overlay ──
+        if game.paused:
+            _draw_pause_overlay(surface, game)
 
         self.screen.fill(BLACK)
         self.screen.blit(surface, (ox, oy))
@@ -119,3 +136,79 @@ def _draw_background(surface):
         pygame.draw.line(surface, (0, 60, 0), (gx, 0), (gx, HEIGHT))
     for gy in range(0, HEIGHT, 40):
         pygame.draw.line(surface, (0, 60, 0), (0, gy), (WIDTH, gy))
+
+def _draw_pause_overlay(surface, game):
+    """Halbtransparentes Pause-Menü mit gesammelten Powerups."""
+    p = game.player
+
+    # Dunkles Overlay
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180))
+    surface.blit(overlay, (0, 0))
+
+    # Panel
+    panel_w, panel_h = 1040, 440
+    px = WIDTH  // 2 - panel_w // 2
+    py = HEIGHT // 2 - panel_h // 2
+    pygame.draw.rect(surface, (25, 25, 40),  (px, py, panel_w, panel_h), border_radius=12)
+    pygame.draw.rect(surface, (140, 80, 255), (px, py, panel_w, panel_h), 2, border_radius=12)
+
+    # Titel
+    title = font_large.render("⏸  PAUSE", True, (180, 120, 255))
+    surface.blit(title, (WIDTH // 2 - title.get_width() // 2, py + 20))
+
+    # Trennlinie
+    pygame.draw.line(surface, (80, 50, 140),
+                     (px + 20, py + 80), (px + panel_w - 20, py + 80), 1)
+
+    # ── Powerups (immer anzeigen) ──
+    items = []
+    if p.powerup_level > 0:
+        items.append(("🔵 BulletTime Stacks", f"{p.powerup_level}x  (+{round((p.shoot_speed_mult - 1) * 100, 1)}% Feuerrate)"))
+    if p.damage_level > 0:
+        items.append(("💥 DamageUp Stacks",   f"{p.damage_level}x  (+{round((p.damage_mult - 1) * 100, 1)}% Schaden)"))
+    if p.size_level > 0:
+        items.append(("🟢 GetsBigger Stacks", f"{p.size_level}x  (+{round((p.size_mult - 1) * 100, 1)}% Projektilgröße)"))
+    if p.has_shield:
+        items.append(("🛡 Schild", "Aktiv"))
+
+    # ── Aktive Waffe ──
+    if p.has_laser:
+        items.append(("🔴 Laser", "Ausgerüstet"))
+    elif p.has_smg:
+        items.append(("🟠 SMG", "Ausgerüstet"))
+    elif p.has_shotgun:
+        items.append(("🟤 Shotgun", "Ausgerüstet"))
+    else:
+        items.append(("🔫 Pistole", "Ausgerüstet"))
+
+    # ── Aktive Trinkets ──
+    if getattr(p, "has_swiftness", False):
+        items.append(("⚡ Swiftness", "Aktiv  (+15% Geschwindigkeit)"))
+    sat_count = len(getattr(p, "satellites", []))
+    if sat_count > 0:
+        items.append(("🔮 OrbitalMiniME", f"{sat_count}x Satellit aktiv"))
+
+    # Fallback wenn gar nichts gesammelt
+    if not items:
+        items.append(("—", "Noch keine Items gesammelt"))
+
+    y = py + 100
+    for label, value in items:
+        label_s = font_mid.render(label, True, (200, 200, 220))
+        value_s = font_mid.render(value, True, (255, 220, 80))
+        surface.blit(label_s, (px + 30, y))
+        surface.blit(value_s, (px + panel_w - value_s.get_width() - 30, y))
+        y += 48
+
+    # Trennlinie
+    pygame.draw.line(surface, (80, 50, 140),
+                     (px + 20, y + 8), (px + panel_w - 20, y + 8), 1)
+
+    # Hinweis
+    hint = font_small.render("[TAB]  –  Spiel fortsetzen", True, (140, 140, 160))
+    surface.blit(hint, (WIDTH // 2 - hint.get_width() // 2, py + panel_h - 36))
+
+
+
+

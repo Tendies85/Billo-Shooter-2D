@@ -11,9 +11,10 @@ from billo.systems.sounds import create_sound_map
 
 from billo.entities.bullets import Bullet
 from billo.weapons.smg import SMGBullet
+from billo.weapons.shotgun import ShotgunBullet
 
 class Player:
-    BASE_COOLDOWN = 15   # Default-Pistole Basis-Cooldown (Frames)
+    BASE_COOLDOWN = 30   # Default-Pistole Basis-Cooldown (50% langsamer als vorher)
 
     def __init__(self):
         self.x = WIDTH // 2
@@ -22,6 +23,7 @@ class Player:
         self.speed = 4
         self.hp = 100
         self.max_hp = 100
+        self.xp  = 0   # Gesammelte Erfahrungspunkte
         self.angle = 0          # Blickrichtung zur Maus
         self.shoot_cooldown = 0
         self.invincible     = 0  # Frames Unverwundbarkeit (60 = 1 Sek.)
@@ -34,9 +36,14 @@ class Player:
         self.laser_tick_mult  = 1.0   # Schadenstakt-Multiplikator (BulletTime)
         # --- SMG ---
         self.has_smg          = False  # SMG aktiv?
+        # --- Shotgun ---
+        self.has_shotgun      = False  # Shotgun aktiv?
         # --- Schaden ---
         self.damage_mult      = 1.0   # Multiplikator für Waffenschaden (stapelbar)
         self.damage_level     = 0     # Anzahl eingesammelter DamageUp-Items
+        # --- Projektilgröße ---
+        self.size_mult        = 1.0   # Multiplikator für Projektil-/Laserbreite
+        self.size_level       = 0     # Anzahl eingesammelter GetsBigger-Items
         # --- Schild ---
         self.has_shield       = False  # Schutzschild aktiv?
         self.shield_pulse     = 0.0   # Puls-Animation-Phase
@@ -141,7 +148,7 @@ class Player:
         gun_len = 22
         ex = self.x + math.cos(self.angle) * gun_len
         ey = self.y + math.sin(self.angle) * gun_len
-        barrel_color = (255, 60, 60) if self.has_laser else (255, 160, 30) if self.has_smg else GRAY
+        barrel_color = (255, 60, 60) if self.has_laser else (255, 160, 30) if self.has_smg else (180, 130, 60) if self.has_shotgun else GRAY
         pygame.draw.line(surface, barrel_color, (int(self.x), int(self.y)), (int(ex), int(ey)), 5)
 
         # Schimmernder Schutzschild-Ring
@@ -195,6 +202,11 @@ class Player:
             smg_surf = font_small.render("🟠 SMG aktiv", True, (255, 160, 30))
             surface.blit(smg_surf, (bx, by - 46))
 
+        # Shotgun-Indikator
+        if self.has_shotgun:
+            sg_surf = font_small.render("🟤 SHOTGUN aktiv", True, (200, 140, 60))
+            surface.blit(sg_surf, (bx, by - 46))
+
         # Schild-Indikator
         if self.has_shield:
             shield_surf = font_small.render("🛡 SCHILD aktiv", True, (140, 180, 255))
@@ -208,16 +220,24 @@ class Player:
     def shoot(self):
         if self.shoot_cooldown == 0:
             if self.has_smg:
-                # SMG: 50 % kürzerer Cooldown, SMGBullet (50 % weniger Schaden)
                 self.shoot_cooldown = max(1, int(self.BASE_COOLDOWN * 0.5 / self.shoot_speed_mult))
                 random.choice(self.sounds["pews"]).play()
-                return SMGBullet(self.x, self.y, self.angle)
+                return [SMGBullet(self.x, self.y, self.angle, self.size_mult)]
+            elif self.has_shotgun:
+                # 3 Pellets mit je ±15° Streuung
+                self.shoot_cooldown = max(1, int(self.BASE_COOLDOWN * 1.5 / self.shoot_speed_mult))
+                random.choice(self.sounds["pews"]).play()
+                spread = math.radians(15)
+                return [
+                    ShotgunBullet(self.x, self.y, self.angle - spread, self.size_mult),
+                    ShotgunBullet(self.x, self.y, self.angle,           self.size_mult),
+                    ShotgunBullet(self.x, self.y, self.angle + spread, self.size_mult),
+                ]
             else:
-                # Default-Pistole
                 self.shoot_cooldown = max(1, int(self.BASE_COOLDOWN / self.shoot_speed_mult))
                 random.choice(self.sounds["pews"]).play()
-                return Bullet(self.x, self.y, self.angle)
-        return None
+                return [Bullet(self.x, self.y, self.angle, self.size_mult)]
+        return []
 
     def collect_powerup(self):
         self.powerup_level    += 1
@@ -225,12 +245,19 @@ class Player:
         self.laser_tick_mult  *= 1.02   # +2 % Tick-Rate für Laser
 
     def collect_laser_powerup(self):
-        self.has_laser = True
-        self.has_smg   = False   # Laser ersetzt die SMG
+        self.has_laser   = True
+        self.has_smg     = False
+        self.has_shotgun = False
 
     def collect_smg_pickup(self):
-        self.has_smg   = True
-        self.has_laser = False   # SMG ersetzt den Laser
+        self.has_smg     = True
+        self.has_laser   = False
+        self.has_shotgun = False
+
+    def collect_shotgun_pickup(self):
+        self.has_shotgun = True
+        self.has_laser   = False
+        self.has_smg     = False
 
     def collect_shield_powerup(self):
         self.has_shield   = True
@@ -239,3 +266,7 @@ class Player:
     def collect_damageup(self):
         self.damage_level += 1
         self.damage_mult  *= 1.02   # +2 % pro Stack
+
+    def collect_getsbigger(self):
+        self.size_level += 1
+        self.size_mult  *= 1.03   # +3 % pro Stack

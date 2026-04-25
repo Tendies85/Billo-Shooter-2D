@@ -18,8 +18,9 @@ class Laser:
         self.ey = py + math.sin(angle) * far
         self.flicker = random.randint(0, 3)
 
-    def draw(self, surface, frame):
-        flicker_w = 3 + (frame + self.flicker) % 2
+    def draw(self, surface, frame, size_mult=1.0):
+        base_w    = max(1, round(3 * size_mult))
+        flicker_w = base_w + (frame + self.flicker) % 2
         glow = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         pygame.draw.line(glow, (255, 60, 60, 60),
                          (int(self.px), int(self.py)),
