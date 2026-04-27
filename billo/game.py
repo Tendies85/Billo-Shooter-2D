@@ -7,17 +7,22 @@ import pygame
 from billo.entities.player import Player
 from billo.entities.zombies import Zombie
 from billo.entities.particles import Particle
+from billo.entities.clonker import Clonker
+from billo.entities.xporb import XPOrb
 
 from billo.weapons.laser import Laser, LaserWeaponPickUp
 from billo.weapons.smg import SMGBullet, SMGPickUp
+from billo.weapons.shotgun import ShotgunBullet, ShotgunPickUp
 
 from billo.powerups.powerup import BulletTime
 from billo.powerups.shield import ShieldPowerUp
 from billo.powerups.damageup import DamageUp
+from billo.powerups.getsbigger import GetsBigger
 
 from billo.systems.sounds import make_laser_sound, make_pew_sound
 
 from billo.trinkets import TRINKET_POOL
+from billo.trinkets.orbital_minime import OrbitalBullet
 
 FPS               = 60
 WAVE_BASE_SECS    = 10   # Welle 1 dauert 10 Sekunden
@@ -51,12 +56,15 @@ class Game:
         self.bullets   = []
         self.zombies   = []
         self.particles = []
+        self.xporbs    = []
 
         self.powerups        = []
         self.laser_pickups   = []
         self.smg_pickups     = []
+        self.shotgun_pickups = []
         self.shield_powerups = []
         self.damageups       = []
+        self.getsbiggers     = []
         self.trinkets        = []
 
         self.score = 0
@@ -72,6 +80,7 @@ class Game:
 
         self.shake_timer = 0
         self.frame       = 0
+        self.paused      = False
 
         self.zombie_spawn_count = 1   # Anzahl Zombies pro Spawn-Intervall
 
@@ -83,7 +92,10 @@ class Game:
     # ------------------------------------------------------------------
     def _spawn_zombie(self):
         for _ in range(self.zombie_spawn_count):
-            self.zombies.append(Zombie(self.wave))
+            if random.random() < 0.20:
+                self.zombies.append(Clonker(self.wave))
+            else:
+                self.zombies.append(Zombie(self.wave))
 
 
     # ------------------------------------------------------------------
@@ -96,10 +108,14 @@ class Game:
             self.shield_powerups.append(ShieldPowerUp())
         if random.random() < 0.20:
             self.damageups.append(DamageUp())
+        if random.random() < 0.20:
+            self.getsbiggers.append(GetsBigger())
         if random.random() < 0.05:
             self.laser_pickups.append(LaserWeaponPickUp())
         if random.random() < 0.05:
             self.smg_pickups.append(SMGPickUp())
+        if random.random() < 0.05:
+            self.shotgun_pickups.append(ShotgunPickUp())
         if random.random() < 0.03:
             trinket_cls = random.choice(TRINKET_POOL)
             self.trinkets.append(trinket_cls())
@@ -114,11 +130,14 @@ class Game:
         # Alle verbliebenen Gegner und Pickups entfernen
         self.zombies         = []
         self.bullets         = []
+        self.xporbs          = []
         self.powerups        = []
         self.shield_powerups = []
         self.damageups       = []
+        self.getsbiggers     = []
         self.laser_pickups   = []
         self.smg_pickups     = []
+        self.shotgun_pickups = []
         self.trinkets        = []
 
         self.player.reset_dash()
@@ -152,17 +171,18 @@ class Game:
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if not self.player.has_laser:
-                    b = self.player.shoot()
-                    if b:
-                        self.bullets.append(b)
+                    self.bullets.extend(self.player.shoot())
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 self.player.try_dash(keys)
 
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_TAB:
+                self.paused = not self.paused
+                if self.paused:
+                    self.sounds["LASER_SOUND"].stop()
+
         if not self.player.has_laser and pygame.mouse.get_pressed()[0]:
-            b = self.player.shoot()
-            if b:
-                self.bullets.append(b)
+            self.bullets.extend(self.player.shoot())
 
         return keys
 
@@ -170,6 +190,9 @@ class Game:
     # UPDATE
     # -------------------------
     def update(self, keys):
+        if self.paused:
+            return True
+
         self.player.update(keys)
         self.frame += 1
 
@@ -222,13 +245,16 @@ class Game:
             for z in self.zombies:
                 if z.alive and math.hypot(b.x - z.x, b.y - z.y) < b.radius + z.radius:
                     b.alive = False
-                    damage = SMGBullet.DAMAGE if isinstance(b, SMGBullet) else 25
+                    damage = SMGBullet.DAMAGE if isinstance(b, SMGBullet) else ShotgunBullet.DAMAGE if isinstance(b, ShotgunBullet) else 25
                     damage = int(damage * self.player.damage_mult)
                     killed = z.hit(damage)
                     for _ in range(8):
                         self.particles.append(Particle(z.x, z.y, (180, 30, 30)))
                     if killed:
-                        self.score += 10
+                        xp_count = 3 if isinstance(z, Clonker) else 1
+                        self.score += 10 * xp_count
+                        for _ in range(xp_count):
+                            self.xporbs.append(XPOrb(z.x, z.y))
 
         # Zombie → Player
         for z in self.zombies:
@@ -272,7 +298,10 @@ class Game:
                 ):
                     killed = z.hit(Laser.DAMAGE)
                     if killed:
-                        self.score += 10
+                        xp_count = 3 if isinstance(z, Clonker) else 1
+                        self.score += 10 * xp_count
+                        for _ in range(xp_count):
+                            self.xporbs.append(XPOrb(z.x, z.y))
 
         # Laser-Pickups
         for lpu in self.laser_pickups:
@@ -290,6 +319,14 @@ class Game:
                 spu.alive = False
         self.smg_pickups = [s for s in self.smg_pickups if s.alive]
 
+        # Shotgun-Pickups
+        for sgpu in self.shotgun_pickups:
+            sgpu.update()
+            if math.hypot(self.player.x - sgpu.x, self.player.y - sgpu.y) < sgpu.COLLECT_RADIUS + self.player.radius:
+                self.player.collect_shotgun_pickup()
+                sgpu.alive = False
+        self.shotgun_pickups = [s for s in self.shotgun_pickups if s.alive]
+
         # Shield-Powerups
         for spu in self.shield_powerups:
             spu.update()
@@ -306,6 +343,14 @@ class Game:
                 du.alive = False
         self.damageups = [d for d in self.damageups if d.alive]
 
+        # GetsBigger-Pickups
+        for gb in self.getsbiggers:
+            gb.update()
+            if math.hypot(self.player.x - gb.x, self.player.y - gb.y) < gb.COLLECT_RADIUS + self.player.radius:
+                self.player.collect_getsbigger()
+                gb.alive = False
+        self.getsbiggers = [g for g in self.getsbiggers if g.alive]
+
         # Trinkets
         for t in self.trinkets:
             t.update()
@@ -314,11 +359,36 @@ class Game:
                 t.alive = False
         self.trinkets = [t for t in self.trinkets if t.alive]
 
+        # Orbital-Satelliten
+        living_enemies = [z for z in self.zombies if z.alive]
+        for sat in getattr(self.player, "satellites", []):
+            sat.update(self.player.x, self.player.y, living_enemies)
+            # Satelliten-Bullets auf Gegner prüfen
+            for b in sat.bullets:
+                for z in self.zombies:
+                    if z.alive and math.hypot(b.x - z.x, b.y - z.y) < b.radius + z.radius:
+                        b.alive = False
+                        killed = z.hit(OrbitalBullet.DAMAGE)
+                        for _ in range(6):
+                            self.particles.append(Particle(z.x, z.y, (160, 80, 255)))
+                        if killed:
+                            xp_count = 3 if isinstance(z, Clonker) else 1
+                            self.score += 10 * xp_count
+                            for _ in range(xp_count):
+                                self.xporbs.append(XPOrb(z.x, z.y))
+
+        # XP-Orbs
+        for orb in self.xporbs:
+            orb.update(self.player.x, self.player.y)
+            if math.hypot(self.player.x - orb.x, self.player.y - orb.y) < orb.COLLECT_RADIUS + self.player.radius:
+                self.player.xp += orb.VALUE
+                orb.alive = False
+        self.xporbs = [o for o in self.xporbs if o.alive]
+
         # Game Over
         if self.player.hp <= 0:
             self.sounds["LASER_SOUND"].stop()
             return False
 
         return True
-
 

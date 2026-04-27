@@ -9,13 +9,13 @@ class SMGBullet:
     """Kleineres, schnelleres Projektil der SMG – macht 50 % weniger Schaden."""
     DAMAGE = 12
 
-    def __init__(self, x, y, angle):
+    def __init__(self, x, y, angle, size_mult=1.0):
         self.x = x
         self.y = y
         self.speed = 13
         self.dx = math.cos(angle) * self.speed
         self.dy = math.sin(angle) * self.speed
-        self.radius = 3
+        self.radius = max(1, round(3 * size_mult))
         self.alive = True
 
     def update(self):
