@@ -4,13 +4,21 @@ import pygame
 
 from billo.settings import WIDTH, HEIGHT
 
+import random
+import math
+import pygame
+
+from billo.settings import WIDTH, HEIGHT
+
 
 class Collectible:
     COLLECT_RADIUS = 20
     GLOW_COLOR     = (255, 255, 255)
+
     BOB_AMPLITUDE  = 3
     BOB_SPEED      = 0.07
     MARGIN         = 60
+    RARITY         = 0.03
 
     def __init__(self):
         self.x = random.randint(self.MARGIN, WIDTH  - self.MARGIN)
@@ -45,5 +53,6 @@ class Collectible:
     def draw_icon(self, surface, cx, cy):
         raise NotImplementedError
 
-    def apply(self, player):
+    def on_collect(self, player):
+        """Unified hook (replaces apply)."""
         raise NotImplementedError

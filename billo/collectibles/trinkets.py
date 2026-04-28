@@ -1,9 +1,63 @@
 import math
-import random
 import pygame
 
-from billo.settings import WIDTH, HEIGHT, WHITE
-from billo.trinkets.base import BaseTrinket
+from billo.collectibles import Collectible
+from billo.settings import WHITE
+
+
+class Trinket(Collectible):
+    COLLECT_RADIUS = 22
+    GLOW_COLOR     = (180, 80, 255)
+
+    def __init__(self):
+        super().__init__()
+        self._rot = 0.0
+
+    def update(self):
+        super().update()
+        self._rot += 2.0
+
+    def draw(self, surface):
+        cx, cy = self.get_draw_pos()
+
+        # stronger glow
+        self.draw_glow(surface, cx, cy)
+
+        # background disk
+        pygame.draw.circle(surface, (60, 20, 90), (cx, cy), self.COLLECT_RADIUS)
+        pygame.draw.circle(surface, self.GLOW_COLOR, (cx, cy), self.COLLECT_RADIUS, 2)
+
+        # icon
+        self.draw_icon(surface, cx, cy)
+
+        # rotating sparkle
+        angle = math.radians(self._rot)
+        sx = int(cx + math.cos(angle) * (self.COLLECT_RADIUS - 2))
+        sy = int(cy + math.sin(angle) * (self.COLLECT_RADIUS - 2))
+        pygame.draw.circle(surface, WHITE, (sx, sy), 2)
+
+
+
+class SwiftnessTrinket(Trinket):
+    GLOW_COLOR = (255, 220, 40)
+
+    def draw_icon(self, surface, cx, cy):
+        bolt = [
+            (cx + 4,  cy - 14),
+            (cx - 2,  cy - 2),
+            (cx + 4,  cy - 2),
+            (cx - 4,  cy + 14),
+            (cx + 2,  cy + 2),
+            (cx - 4,  cy + 2),
+        ]
+        pygame.draw.polygon(surface, (255, 230, 50), bolt)
+        pygame.draw.polygon(surface, WHITE, bolt, 1)
+
+    def on_collect(self, player):
+        if not getattr(player, "has_swiftness", False):
+            player.has_swiftness = True
+            player.speed *= 1.15
+
 
 
 FPS             = 60
@@ -12,7 +66,6 @@ ORBIT_SPEED     = 1.8     # Grad pro Frame
 SHOOT_INTERVAL  = 2 * FPS  # alle 2 Sekunden
 
 
-# ── Orbital-Projektil ─────────────────────────────────────────────────────────
 class OrbitalBullet:
     """Kleines Projektil das der Satellit abfeuert."""
     DAMAGE = 20
@@ -37,7 +90,6 @@ class OrbitalBullet:
         pygame.draw.circle(surface, WHITE,            (int(self.x), int(self.y)), self.radius, 1)
 
 
-# ── Orbital-Satellit ──────────────────────────────────────────────────────────
 class OrbitalSatellite:
     """
     Kleine unzerstörbare Kugel die um den Spieler kreist und alle 2s schießt.
@@ -111,29 +163,24 @@ class OrbitalSatellite:
             b.draw(surface)
 
 
-# ── Trinket ───────────────────────────────────────────────────────────────────
-class OrbitalMiniME(BaseTrinket):
-    """
-    Trinket – OrbitalMiniME
-    Beim Einsammeln erscheint ein Satellit der in einem Orbit um den Spieler
-    kreist und alle 2 Sekunden auf den nächsten Gegner schießt.
-    Nicht zerstörbar. Stapelbar (mehrere Satelliten).
-    Icon: kleiner Kreis der einen größeren Kreis umkreist.
-    """
+class OrbitalMiniME(Trinket):
     GLOW_COLOR = (160, 80, 255)
-    LABEL      = "OrbitalMiniME"
 
     def draw_icon(self, surface, cx, cy):
-        # Zentralkörper
         pygame.draw.circle(surface, (200, 150, 255), (cx, cy), 6)
-        # Orbit-Ring
         pygame.draw.circle(surface, (180, 100, 255), (cx, cy), 14, 1)
-        # Kleiner Satellit auf dem Ring
         pygame.draw.circle(surface, WHITE, (cx + 14, cy), 3)
 
-    def apply(self, player):
+    def on_collect(self, player):
         if not hasattr(player, "satellites"):
             player.satellites = []
-        # Versatz damit mehrere Satelliten gleichmäßig verteilt sind
-        offset = len(player.satellites) * (2 * math.pi / max(1, len(player.satellites) + 1))
-        player.satellites.append(OrbitalSatellite(offset_angle=offset))
+
+        offset = len(player.satellites) * (
+            2 * math.pi / max(1, len(player.satellites) + 1)
+        )
+
+        player.satellites.append(
+            OrbitalSatellite(offset_angle=offset)
+        )
+
+

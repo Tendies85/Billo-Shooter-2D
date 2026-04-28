@@ -14,17 +14,12 @@ from billo.weapons.laser import Laser, LaserWeaponPickUp
 from billo.weapons.smg import SMGBullet, SMGPickUp
 from billo.weapons.shotgun import ShotgunBullet, ShotgunPickUp
 
-#from billo.powerups.powerup import BulletTime
-#from billo.powerups.shield import ShieldPowerUp
-#from billo.powerups.damageup import DamageUp
-#from billo.powerups.getsbigger import GetsBigger
-
 from billo.collectibles.powerups import DamageUp, GetsBigger, ShieldPowerUp, BulletTime
+from billo.collectibles.trinkets import OrbitalMiniME, OrbitalBullet, SwiftnessTrinket
 
 from billo.systems.sounds import make_laser_sound, make_pew_sound
 
-from billo.trinkets import TRINKET_POOL
-from billo.trinkets.orbital_minime import OrbitalBullet
+from billo.collectibles import COLLECTIBLE_POOL
 
 FPS               = 60
 WAVE_BASE_SECS    = 10   # Welle 1 dauert 10 Sekunden
@@ -119,7 +114,7 @@ class Game:
         if random.random() < 0.05:
             self.shotgun_pickups.append(ShotgunPickUp())
         if random.random() < 0.03:
-            trinket_cls = random.choice(TRINKET_POOL)
+            trinket_cls = random.choice(COLLECTIBLE_POOL)
             self.trinkets.append(trinket_cls())
 
     # ------------------------------------------------------------------
@@ -357,7 +352,7 @@ class Game:
         for t in self.trinkets:
             t.update()
             if math.hypot(self.player.x - t.x, self.player.y - t.y) < t.COLLECT_RADIUS + self.player.radius:
-                t.apply(self.player)
+                t.on_collect(self.player)
                 t.alive = False
         self.trinkets = [t for t in self.trinkets if t.alive]
 

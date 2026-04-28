@@ -5,7 +5,6 @@ from billo.settings import WHITE
 from billo.collectibles import Collectible
 
 class PowerUp(Collectible):
-    """Shared base for simple stat upgrades."""
     pass
 
 
@@ -118,7 +117,7 @@ class ShieldPowerUp(PowerUp):
 
 class LaserPowerUp(PowerUp):
     COLLECT_RADIUS = 20
-    GLOW_COLOR     = (255, 80, 80)
+    LOW_COLOR     = (255, 80, 80)
 
     def __init__(self):
         super().__init__()
