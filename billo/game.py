@@ -8,14 +8,11 @@ from billo.entities.player import Player
 from billo.entities.zombies import Zombie
 from billo.entities.particles import Particle
 from billo.entities.clonker import Clonker
-from billo.entities.xporb import XPOrb
-
-from billo.weapons.laser import Laser, LaserWeaponPickUp
-from billo.weapons.smg import SMGBullet, SMGPickUp
-from billo.weapons.shotgun import ShotgunBullet, ShotgunPickUp
 
 from billo.collectibles.powerups import DamageUp, GetsBigger, ShieldPowerUp, BulletTime
 from billo.collectibles.trinkets import OrbitalMiniME, OrbitalBullet, SwiftnessTrinket
+from billo.collectibles.weapons import Laser, LaserWeaponPickUp, SMGBullet, SMGPickUp, ShotgunPickUp, ShotgunBullet
+from billo.collectibles.floater import XPOrb
 
 from billo.systems.sounds import make_laser_sound, make_pew_sound
 
