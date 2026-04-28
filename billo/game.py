@@ -14,10 +14,12 @@ from billo.weapons.laser import Laser, LaserWeaponPickUp
 from billo.weapons.smg import SMGBullet, SMGPickUp
 from billo.weapons.shotgun import ShotgunBullet, ShotgunPickUp
 
-from billo.powerups.powerup import BulletTime
-from billo.powerups.shield import ShieldPowerUp
-from billo.powerups.damageup import DamageUp
-from billo.powerups.getsbigger import GetsBigger
+#from billo.powerups.powerup import BulletTime
+#from billo.powerups.shield import ShieldPowerUp
+#from billo.powerups.damageup import DamageUp
+#from billo.powerups.getsbigger import GetsBigger
+
+from billo.collectibles.powerups import DamageUp, GetsBigger, ShieldPowerUp, BulletTime
 
 from billo.systems.sounds import make_laser_sound, make_pew_sound
 
